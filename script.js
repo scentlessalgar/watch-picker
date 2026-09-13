@@ -53,6 +53,19 @@ async function loadGenres() {
 }
 
 // ============================================================
+// MOVIE / TV TOGGLE BUTTONS
+// ============================================================
+const typeToggle = document.getElementById("typeToggle");
+let selectedType = "any"; // "any" | "movie" | "tv"
+typeToggle.querySelectorAll(".toggle-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    typeToggle.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedType = btn.dataset.value;
+  });
+});
+
+// ============================================================
 // STREAMING SERVICE CHECKBOXES
 // ============================================================
 const serviceList = document.getElementById("serviceList");
@@ -66,28 +79,43 @@ function getCheckedProviderIds() {
 }
 
 // ============================================================
-// RUNTIME / RATING SLIDER LABELS
+// RUNTIME / RATING SLIDERS
 // ============================================================
+
+// Colours in the filled part of a slider's track, based on its current value.
+function updateSliderFill(input) {
+  const min = Number(input.min), max = Number(input.max), val = Number(input.value);
+  const pct = ((val - min) / (max - min)) * 100;
+  input.style.setProperty("--fill", pct + "%");
+}
+
+// Max length: a small set of preset stops rather than a free-moving slider.
+// "Longer" (minutes: null) means no cap is applied at all.
+const RUNTIME_STEPS = [
+  { minutes: 20, label: "20 mins" },
+  { minutes: 30, label: "30 mins" },
+  { minutes: 45, label: "45 mins" },
+  { minutes: 60, label: "1 hour" },
+  { minutes: 120, label: "2 hours" },
+  { minutes: 180, label: "3 hours" },
+  { minutes: null, label: "Longer" },
+];
 const maxRuntimeInput = document.getElementById("maxRuntime");
 const maxRuntimeValue = document.getElementById("maxRuntimeValue");
-function formatRuntime(mins) {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
 function updateRuntimeLabel() {
-  maxRuntimeValue.textContent = formatRuntime(Number(maxRuntimeInput.value));
+  maxRuntimeValue.textContent = RUNTIME_STEPS[Number(maxRuntimeInput.value)].label;
+  updateSliderFill(maxRuntimeInput);
 }
 maxRuntimeInput.addEventListener("input", updateRuntimeLabel);
 updateRuntimeLabel();
 
+// Minimum rating, shown as TMDB's familiar percentage score (e.g. "70%+").
 const minRatingInput = document.getElementById("minRating");
 const minRatingValue = document.getElementById("minRatingValue");
 function updateRatingLabel() {
   const v = Number(minRatingInput.value);
-  minRatingValue.textContent = v === 0 ? "Any" : `${v}+`;
+  minRatingValue.textContent = v === 0 ? "Any" : `${v}%+`;
+  updateSliderFill(minRatingInput);
 }
 minRatingInput.addEventListener("input", updateRatingLabel);
 updateRatingLabel();
@@ -115,8 +143,9 @@ async function fetchCandidates(mediaType, genreName, maxRuntime, minRating, prov
   }
 
   // TMDB only supports filtering movies by runtime, not TV shows
-  // (a series doesn't have one single length).
-  if (mediaType === "movie") {
+  // (a series doesn't have one single length). maxRuntime === null means
+  // "Longer" was picked, i.e. no cap at all.
+  if (mediaType === "movie" && maxRuntime !== null) {
     params["with_runtime.lte"] = maxRuntime;
   }
 
@@ -149,7 +178,7 @@ async function renderPick(pick, providerIds) {
   const title = pick.title || pick.name;
   const dateStr = pick.release_date || pick.first_air_date;
   const year = dateStr ? dateStr.slice(0, 4) : "";
-  const rating = pick.vote_average ? pick.vote_average.toFixed(1) : "?";
+  const rating = pick.vote_average ? Math.round(pick.vote_average * 10) : "?";
   const poster = pick.poster_path ? `${IMG_BASE}${pick.poster_path}` : null;
 
   // Find out exactly which of the person's own services actually carry
@@ -175,7 +204,7 @@ async function renderPick(pick, providerIds) {
       ${poster ? `<img class="poster" src="${poster}" alt="${title} poster">` : ""}
       <div class="result-text">
         <h2>${title}${year ? ` (${year})` : ""}</h2>
-        <p class="meta">${pick.media_type === "movie" ? "Movie" : "TV show"} · ${rating}/10</p>
+        <p class="meta">${pick.media_type === "movie" ? "Movie" : "TV show"} · ${rating}%</p>
         <p class="overview">${pick.overview || "No description available."}</p>
         <div class="badges">
           ${(matchedNames.length ? matchedNames : ["Check availability"]).map(n => `<span class="badge">${n}</span>`).join("")}
@@ -189,10 +218,10 @@ async function renderPick(pick, providerIds) {
 // MAIN BUTTON HANDLER
 // ============================================================
 async function pickSomething() {
-  const type = document.getElementById("type").value;
+  const type = selectedType;
   const genre = genreSelect.value;
-  const maxRuntime = Number(maxRuntimeInput.value);
-  const minRating = Number(minRatingInput.value);
+  const maxRuntime = RUNTIME_STEPS[Number(maxRuntimeInput.value)].minutes; // null = no cap
+  const minRating = Number(minRatingInput.value) / 10; // TMDB's vote_average is 0-10
   const providerIds = getCheckedProviderIds();
 
   if (providerIds.length === 0) {
@@ -232,7 +261,7 @@ async function pickSomething() {
     emptyMessage.classList.remove("hidden");
   } finally {
     pickBtn.disabled = false;
-    pickBtn.textContent = "Surprise us 🎲";
+    pickBtn.textContent = "Suggest some options 🎲";
   }
 }
 
