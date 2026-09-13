@@ -105,14 +105,25 @@ select {
 
 .result.hidden, .empty.hidden { display: none; }
 
-.result h2 { margin: 0 0 4px; }
-.result .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 10px; }
+.result-inner { display: flex; gap: 16px; }
+.result .poster { width: 110px; border-radius: 8px; flex-shrink: 0; }
+.result-text { min-width: 0; }
+.result h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.result .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
+.result .overview { font-size: 0.85rem; color: var(--text); margin: 0 0 10px; }
 .result .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .result .badge {
   background: #22263a;
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 0.8rem;
+}
+
+#pickBtn:disabled { opacity: 0.6; cursor: default; }
+
+@media (max-width: 420px) {
+  .result-inner { flex-direction: column; }
+  .result .poster { width: 100%; max-width: 160px; }
 }
 
 .empty {

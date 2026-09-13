@@ -1,53 +1,73 @@
 // ============================================================
-// SAMPLE DATA
-// This is a small hand-written list standing in for a real
-// database. Once we have a TMDB API key, this whole block gets
-// replaced by a live lookup — nothing else in the file changes.
+// CONFIG
 // ============================================================
-const SHOWS = [
-  { title: "The Grand Budapest Hotel", type: "movie", genre: "Comedy", runtime: 100, rating: 8, services: ["Disney+", "Prime Video"] },
-  { title: "Stranger Things", type: "tv", genre: "Sci-Fi", runtime: 50, rating: 8, services: ["Netflix"] },
-  { title: "Knives Out", type: "movie", genre: "Mystery", runtime: 130, rating: 8, services: ["Netflix", "Prime Video"] },
-  { title: "Ted Lasso", type: "tv", genre: "Comedy", runtime: 30, rating: 8, services: ["Apple TV+"] },
-  { title: "Dune", type: "movie", genre: "Sci-Fi", runtime: 155, rating: 8, services: ["Prime Video"] },
-  { title: "The Bear", type: "tv", genre: "Drama", runtime: 30, rating: 8, services: ["Disney+"] },
-  { title: "Paddington 2", type: "movie", genre: "Comedy", runtime: 103, rating: 8, services: ["Netflix", "Prime Video"] },
-  { title: "Slow Horses", type: "tv", genre: "Drama", runtime: 50, rating: 8, services: ["Apple TV+"] },
-  { title: "Everything Everywhere All at Once", type: "movie", genre: "Sci-Fi", runtime: 140, rating: 8, services: ["Prime Video"] },
-  { title: "Fleabag", type: "tv", genre: "Comedy", runtime: 25, rating: 8, services: ["Prime Video"] },
-  { title: "The Queen's Gambit", type: "tv", genre: "Drama", runtime: 55, rating: 8, services: ["Netflix"] },
-  { title: "Mad Max: Fury Road", type: "movie", genre: "Action", runtime: 120, rating: 8, services: ["Netflix"] },
-  { title: "Only Murders in the Building", type: "tv", genre: "Mystery", runtime: 35, rating: 7, services: ["Disney+"] },
-  { title: "The Menu", type: "movie", genre: "Horror", runtime: 107, rating: 7, services: ["Disney+"] },
-  { title: "Severance", type: "tv", genre: "Sci-Fi", runtime: 50, rating: 8, services: ["Apple TV+"] },
+const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2MmE2NDQ4NGZkZTVjZTE2YjU3MDFhNmUyNzA5ZmEwNyIsIm5iZiI6MTc4OTMxNDU0Ni44OCwic3ViIjoiNmFhNmM1ZjJhNWUyMjBhOTM5YTk4MWM3Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9._8bREwsUIY-yzu8RYJ7WEK6FJFqIImvpc7yhB0OUIWw";
+const API_BASE = "https://api.themoviedb.org/3";
+const IMG_BASE = "https://image.tmdb.org/t/p/w342";
+const REGION = "GB";
+
+// Streaming services offered as checkboxes, with their TMDB provider IDs.
+const PROVIDERS = [
+  { name: "Netflix", id: 8 },
+  { name: "Prime Video", id: 119 },
+  { name: "Disney+", id: 337 },
+  { name: "Apple TV+", id: 350 },
 ];
 
-const ALL_SERVICES = ["Netflix", "Prime Video", "Disney+", "Apple TV+"];
+// A small helper so every call to TMDB looks the same: build the
+// URL, attach the API key, and turn the response into plain data.
+async function tmdb(path, params = {}) {
+  const url = new URL(API_BASE + path);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`TMDB request failed (${res.status})`);
+  return res.json();
+}
 
 // ============================================================
-// BUILD THE FILTER CONTROLS
+// GENRES — fetched live so the dropdown always matches TMDB's own list.
+// Movies and TV shows use slightly different genre lists/IDs, so we
+// keep two lookup tables (name -> id) and pick the right one later.
 // ============================================================
-
-// Genre dropdown: build it from whatever genres appear in the data,
-// so it stays correct even as the list grows.
+const movieGenres = {};
+const tvGenres = {};
 const genreSelect = document.getElementById("genre");
-const genres = [...new Set(SHOWS.map(s => s.genre))].sort();
-genres.forEach(g => {
-  const opt = document.createElement("option");
-  opt.value = g;
-  opt.textContent = g;
-  genreSelect.appendChild(opt);
-});
 
-// Streaming service checkboxes
+async function loadGenres() {
+  const [movies, shows] = await Promise.all([
+    tmdb("/genre/movie/list", { language: "en-GB" }),
+    tmdb("/genre/tv/list", { language: "en-GB" }),
+  ]);
+  movies.genres.forEach(g => (movieGenres[g.name] = g.id));
+  shows.genres.forEach(g => (tvGenres[g.name] = g.id));
+
+  const allNames = [...new Set([...Object.keys(movieGenres), ...Object.keys(tvGenres)])].sort();
+  allNames.forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    genreSelect.appendChild(opt);
+  });
+}
+
+// ============================================================
+// STREAMING SERVICE CHECKBOXES
+// ============================================================
 const serviceList = document.getElementById("serviceList");
-ALL_SERVICES.forEach(service => {
+PROVIDERS.forEach(service => {
   const label = document.createElement("label");
-  label.innerHTML = `<input type="checkbox" value="${service}" checked> ${service}`;
+  label.innerHTML = `<input type="checkbox" value="${service.id}" checked> ${service.name}`;
   serviceList.appendChild(label);
 });
+function getCheckedProviderIds() {
+  return [...serviceList.querySelectorAll("input:checked")].map(i => Number(i.value));
+}
 
-// Runtime slider label (e.g. "1h 40m")
+// ============================================================
+// RUNTIME / RATING SLIDER LABELS
+// ============================================================
 const maxRuntimeInput = document.getElementById("maxRuntime");
 const maxRuntimeValue = document.getElementById("maxRuntimeValue");
 function formatRuntime(mins) {
@@ -63,7 +83,6 @@ function updateRuntimeLabel() {
 maxRuntimeInput.addEventListener("input", updateRuntimeLabel);
 updateRuntimeLabel();
 
-// Rating slider label
 const minRatingInput = document.getElementById("minRating");
 const minRatingValue = document.getElementById("minRatingValue");
 function updateRatingLabel() {
@@ -74,48 +93,153 @@ minRatingInput.addEventListener("input", updateRatingLabel);
 updateRatingLabel();
 
 // ============================================================
-// THE PICK LOGIC
+// FETCHING CANDIDATES FROM TMDB
+// ============================================================
+async function fetchCandidates(mediaType, genreName, maxRuntime, minRating, providerIds) {
+  const genreMap = mediaType === "movie" ? movieGenres : tvGenres;
+
+  const params = {
+    language: "en-GB",
+    sort_by: "popularity.desc",
+    watch_region: REGION,
+    with_watch_providers: providerIds.join("|"), // "|" = any of these services
+    with_watch_monetization_types: "flatrate", // only things included in a subscription
+    "vote_average.gte": minRating,
+    "vote_count.gte": 50, // ignore obscure titles with barely any votes
+    page: 1,
+  };
+
+  if (genreName !== "any") {
+    if (!genreMap[genreName]) return []; // this genre doesn't exist for this media type
+    params.with_genres = genreMap[genreName];
+  }
+
+  // TMDB only supports filtering movies by runtime, not TV shows
+  // (a series doesn't have one single length).
+  if (mediaType === "movie") {
+    params["with_runtime.lte"] = maxRuntime;
+  }
+
+  const endpoint = mediaType === "movie" ? "/discover/movie" : "/discover/tv";
+  const first = await tmdb(endpoint, params);
+  let results = first.results || [];
+
+  // Grab a random page (not just the most popular page every time)
+  // so repeated clicks don't always surface the same handful of titles.
+  const totalPages = Math.min(first.total_pages || 1, 10);
+  if (totalPages > 1) {
+    const randomPage = 1 + Math.floor(Math.random() * totalPages);
+    if (randomPage !== 1) {
+      const more = await tmdb(endpoint, { ...params, page: randomPage });
+      results = more.results || [];
+    }
+  }
+
+  return results.map(r => ({ ...r, media_type: mediaType }));
+}
+
+// ============================================================
+// RENDERING A PICK
 // ============================================================
 const resultBox = document.getElementById("result");
 const emptyMessage = document.getElementById("emptyMessage");
+const pickBtn = document.getElementById("pickBtn");
 
-function getCheckedServices() {
-  return [...serviceList.querySelectorAll("input:checked")].map(i => i.value);
-}
+async function renderPick(pick, providerIds) {
+  const title = pick.title || pick.name;
+  const dateStr = pick.release_date || pick.first_air_date;
+  const year = dateStr ? dateStr.slice(0, 4) : "";
+  const rating = pick.vote_average ? pick.vote_average.toFixed(1) : "?";
+  const poster = pick.poster_path ? `${IMG_BASE}${pick.poster_path}` : null;
 
-function pickSomething() {
-  const type = document.getElementById("type").value;
-  const genre = genreSelect.value;
-  const maxRuntime = Number(maxRuntimeInput.value);
-  const minRating = Number(minRatingInput.value);
-  const myServices = getCheckedServices();
-
-  const matches = SHOWS.filter(show => {
-    if (type !== "any" && show.type !== type) return false;
-    if (genre !== "any" && show.genre !== genre) return false;
-    if (show.runtime > maxRuntime) return false;
-    if (show.rating < minRating) return false;
-    // Keep it only if it's on at least one service the person has ticked.
-    if (!show.services.some(s => myServices.includes(s))) return false;
-    return true;
-  });
-
-  if (matches.length === 0) {
-    resultBox.classList.add("hidden");
-    emptyMessage.classList.remove("hidden");
-    return;
+  // Find out exactly which of the person's own services actually carry
+  // this title (the search filter only guarantees it's on ONE of them).
+  const provPath = pick.media_type === "movie"
+    ? `/movie/${pick.id}/watch/providers`
+    : `/tv/${pick.id}/watch/providers`;
+  let matchedNames = [];
+  try {
+    const provData = await tmdb(provPath);
+    const flatrate = (provData.results && provData.results.GB && provData.results.GB.flatrate) || [];
+    matchedNames = flatrate
+      .filter(p => providerIds.includes(p.provider_id))
+      .map(p => p.provider_name);
+  } catch {
+    // If this side-lookup fails, we still show the pick — just without badges.
   }
 
-  const pick = matches[Math.floor(Math.random() * matches.length)];
   emptyMessage.classList.add("hidden");
   resultBox.classList.remove("hidden");
   resultBox.innerHTML = `
-    <h2>${pick.title}</h2>
-    <p class="meta">${pick.type === "movie" ? "Movie" : "TV show"} · ${formatRuntime(pick.runtime)} · ${pick.rating}/10</p>
-    <div class="badges">
-      ${pick.services.map(s => `<span class="badge">${s}</span>`).join("")}
+    <div class="result-inner">
+      ${poster ? `<img class="poster" src="${poster}" alt="${title} poster">` : ""}
+      <div class="result-text">
+        <h2>${title}${year ? ` (${year})` : ""}</h2>
+        <p class="meta">${pick.media_type === "movie" ? "Movie" : "TV show"} · ${rating}/10</p>
+        <p class="overview">${pick.overview || "No description available."}</p>
+        <div class="badges">
+          ${(matchedNames.length ? matchedNames : ["Check availability"]).map(n => `<span class="badge">${n}</span>`).join("")}
+        </div>
+      </div>
     </div>
   `;
 }
 
-document.getElementById("pickBtn").addEventListener("click", pickSomething);
+// ============================================================
+// MAIN BUTTON HANDLER
+// ============================================================
+async function pickSomething() {
+  const type = document.getElementById("type").value;
+  const genre = genreSelect.value;
+  const maxRuntime = Number(maxRuntimeInput.value);
+  const minRating = Number(minRatingInput.value);
+  const providerIds = getCheckedProviderIds();
+
+  if (providerIds.length === 0) {
+    resultBox.classList.add("hidden");
+    emptyMessage.textContent = "Tick at least one streaming service.";
+    emptyMessage.classList.remove("hidden");
+    return;
+  }
+
+  pickBtn.disabled = true;
+  pickBtn.textContent = "Thinking…";
+  resultBox.classList.add("hidden");
+  emptyMessage.classList.add("hidden");
+
+  try {
+    let candidates = [];
+    if (type === "any") {
+      const [movies, shows] = await Promise.all([
+        fetchCandidates("movie", genre, maxRuntime, minRating, providerIds),
+        fetchCandidates("tv", genre, maxRuntime, minRating, providerIds),
+      ]);
+      candidates = [...movies, ...shows];
+    } else {
+      candidates = await fetchCandidates(type, genre, maxRuntime, minRating, providerIds);
+    }
+
+    if (candidates.length === 0) {
+      emptyMessage.textContent = "Nothing matches those filters — try widening one of them.";
+      emptyMessage.classList.remove("hidden");
+      return;
+    }
+
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    await renderPick(pick, providerIds);
+  } catch (err) {
+    emptyMessage.textContent = `Something went wrong talking to TMDB (${err.message}).`;
+    emptyMessage.classList.remove("hidden");
+  } finally {
+    pickBtn.disabled = false;
+    pickBtn.textContent = "Surprise us 🎲";
+  }
+}
+
+pickBtn.addEventListener("click", pickSomething);
+
+// Load the genre list as soon as the page opens.
+loadGenres().catch(err => {
+  emptyMessage.textContent = `Couldn't load genres from TMDB (${err.message}).`;
+  emptyMessage.classList.remove("hidden");
+});
