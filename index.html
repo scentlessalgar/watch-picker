@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What Shall We Watch?</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>🍿 What Shall We Watch?</h1>
+    <p class="subtitle">Tell it what you're in the mood for, it picks something.</p>
+  </header>
+
+  <main>
+    <section class="filters">
+
+      <div class="field">
+        <label for="type">Movie or TV show?</label>
+        <select id="type">
+          <option value="any">Either</option>
+          <option value="movie">Movie</option>
+          <option value="tv">TV show</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="genre">Genre</label>
+        <select id="genre">
+          <option value="any">Any</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="maxRuntime">Max length: <span id="maxRuntimeValue">3 hours</span></label>
+        <input type="range" id="maxRuntime" min="20" max="180" step="10" value="180">
+      </div>
+
+      <div class="field">
+        <label for="minRating">Minimum rating: <span id="minRatingValue">Any</span></label>
+        <input type="range" id="minRating" min="0" max="9" step="1" value="0">
+      </div>
+
+      <div class="field services">
+        <label>Which services do you have?</label>
+        <div id="serviceList" class="checkbox-list"></div>
+      </div>
+
+    </section>
+
+    <button id="pickBtn">Surprise us 🎲</button>
+
+    <section id="result" class="result hidden"></section>
+    <p id="emptyMessage" class="empty hidden">Nothing matches those filters — try widening one of them.</p>
+  </main>
+
+  <footer>
+    <p id="dataSourceNote">Sample data for now — live database coming soon.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
