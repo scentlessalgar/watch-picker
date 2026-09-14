@@ -119,22 +119,37 @@ input[type="range"]::-moz-range-track {
   background: transparent;
 }
 
-.checkbox-list {
+.service-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.checkbox-list label {
+.service-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: #22263a;
-  padding: 6px 10px;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
   border-radius: 999px;
+  border: 1px solid #33384a;
+  background: #22263a;
+  color: var(--muted);
   font-size: 0.85rem;
-  color: var(--text);
   cursor: pointer;
+}
+.service-btn img {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: block;
+  background: #fff;
+}
+.service-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 #pickBtn {

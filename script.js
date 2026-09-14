@@ -3,7 +3,8 @@
 // ============================================================
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2MmE2NDQ4NGZkZTVjZTE2YjU3MDFhNmUyNzA5ZmEwNyIsIm5iZiI6MTc4OTMxNDU0Ni44OCwic3ViIjoiNmFhNmM1ZjJhNWUyMjBhOTM5YTk4MWM3Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9._8bREwsUIY-yzu8RYJ7WEK6FJFqIImvpc7yhB0OUIWw";
 const API_BASE = "https://api.themoviedb.org/3";
-const IMG_BASE = "https://image.tmdb.org/t/p/w342";
+const IMG_BASE = "https://image.tmdb.org/t/p/w342"; // posters
+const LOGO_BASE = "https://image.tmdb.org/t/p/w92"; // service logos — smaller, no need for poster-size
 const REGION = "GB";
 
 // Streaming services offered as checkboxes. Each maps to one or more TMDB
@@ -86,16 +87,45 @@ typeToggle.querySelectorAll(".toggle-btn").forEach(btn => {
 // STREAMING SERVICE CHECKBOXES
 // ============================================================
 const serviceList = document.getElementById("serviceList");
-PROVIDERS.forEach(service => {
-  const label = document.createElement("label");
-  label.innerHTML = `<input type="checkbox" value="${service.name}" checked> ${service.name}`;
-  serviceList.appendChild(label);
-});
-// Flattens the ticked services into every underlying TMDB provider ID
+
+// Builds the toggle buttons. logoById is optional — if we don't have
+// logos yet (or the lookup fails), the buttons still work, just as
+// text-only pills. All start "on", matching the old checked-by-default checkboxes.
+function buildServiceButtons(logoById = {}) {
+  serviceList.innerHTML = "";
+  PROVIDERS.forEach(service => {
+    const logoPath = logoById[service.ids[0]];
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "service-btn active";
+    btn.dataset.name = service.name;
+    btn.innerHTML = logoPath
+      ? `<img src="${LOGO_BASE}${logoPath}" alt="">${service.name}`
+      : service.name;
+    btn.addEventListener("click", () => btn.classList.toggle("active"));
+    serviceList.appendChild(btn);
+  });
+}
+buildServiceButtons(); // show text-only buttons immediately, no waiting on a network call
+
+// Once we know each service's logo (from TMDB's own provider list — the
+// same source the poster images come from), rebuild the buttons with them.
+async function loadServiceLogos() {
+  try {
+    const data = await tmdb("/watch/providers/movie", { watch_region: REGION });
+    const logoById = {};
+    data.results.forEach(p => { logoById[p.provider_id] = p.logo_path; });
+    buildServiceButtons(logoById);
+  } catch {
+    // Logos are a nice-to-have — if this fails, the text-only buttons already work fine.
+  }
+}
+
+// Flattens the toggled-on services into every underlying TMDB provider ID
 // (including all their tiers) for use in the actual API query.
 function getCheckedProviderIds() {
-  const checkedNames = [...serviceList.querySelectorAll("input:checked")].map(i => i.value);
-  return PROVIDERS.filter(p => checkedNames.includes(p.name)).flatMap(p => p.ids);
+  const activeNames = [...serviceList.querySelectorAll(".service-btn.active")].map(b => b.dataset.name);
+  return PROVIDERS.filter(p => activeNames.includes(p.name)).flatMap(p => p.ids);
 }
 
 // ============================================================
@@ -290,8 +320,9 @@ async function pickSomething() {
 
 pickBtn.addEventListener("click", pickSomething);
 
-// Load the genre list as soon as the page opens.
+// Load the genre list and service logos as soon as the page opens.
 loadGenres().catch(err => {
   emptyMessage.textContent = `Couldn't load genres from TMDB (${err.message}).`;
   emptyMessage.classList.remove("hidden");
 });
+loadServiceLogos();
