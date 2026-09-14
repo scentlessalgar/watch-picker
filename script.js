@@ -6,13 +6,30 @@ const API_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p/w342";
 const REGION = "GB";
 
-// Streaming services offered as checkboxes, with their TMDB provider IDs.
+// Streaming services offered as checkboxes. Each maps to one or more TMDB
+// provider IDs, because TMDB treats every pricing tier of a service (e.g.
+// "with ads") as a separate provider — ticking one checkbox here covers
+// every paid tier of that service, so nothing is missed. IDs confirmed
+// against TMDB's actual UK provider list (checked 2026-09-14).
 const PROVIDERS = [
-  { name: "Netflix", id: 8 },
-  { name: "Prime Video", id: 119 },
-  { name: "Disney+", id: 337 },
-  { name: "Apple TV+", id: 350 },
+  { name: "Netflix", ids: [8, 1796] }, // standard, standard-with-ads
+  { name: "Prime Video", ids: [9, 2100] }, // included-with-Prime, with-ads
+  { name: "Disney+", ids: [337] },
+  { name: "Apple TV+", ids: [350] },
+  { name: "Paramount+", ids: [531, 2303, 2304] }, // plus, premium, basic-with-ads
+  { name: "BBC iPlayer", ids: [38] },
+  { name: "Crunchyroll", ids: [283] },
+  { name: "NOW TV", ids: [39] },
+  { name: "HBO Max", ids: [1899] },
 ];
+
+// Given a TMDB provider ID (possibly a specific tier), find which of our
+// checkbox services it belongs to, so results can be labelled by the
+// service name the person recognises rather than TMDB's tier name.
+function friendlyNameForProviderId(id) {
+  const match = PROVIDERS.find(p => p.ids.includes(id));
+  return match ? match.name : null;
+}
 
 // A small helper so every call to TMDB looks the same: build the
 // URL, attach the API key, and turn the response into plain data.
@@ -71,11 +88,14 @@ typeToggle.querySelectorAll(".toggle-btn").forEach(btn => {
 const serviceList = document.getElementById("serviceList");
 PROVIDERS.forEach(service => {
   const label = document.createElement("label");
-  label.innerHTML = `<input type="checkbox" value="${service.id}" checked> ${service.name}`;
+  label.innerHTML = `<input type="checkbox" value="${service.name}" checked> ${service.name}`;
   serviceList.appendChild(label);
 });
+// Flattens the ticked services into every underlying TMDB provider ID
+// (including all their tiers) for use in the actual API query.
 function getCheckedProviderIds() {
-  return [...serviceList.querySelectorAll("input:checked")].map(i => Number(i.value));
+  const checkedNames = [...serviceList.querySelectorAll("input:checked")].map(i => i.value);
+  return PROVIDERS.filter(p => checkedNames.includes(p.name)).flatMap(p => p.ids);
 }
 
 // ============================================================
@@ -190,9 +210,12 @@ async function renderPick(pick, providerIds) {
   try {
     const provData = await tmdb(provPath);
     const flatrate = (provData.results && provData.results.GB && provData.results.GB.flatrate) || [];
-    matchedNames = flatrate
-      .filter(p => providerIds.includes(p.provider_id))
-      .map(p => p.provider_name);
+    matchedNames = [...new Set(
+      flatrate
+        .filter(p => providerIds.includes(p.provider_id))
+        .map(p => friendlyNameForProviderId(p.provider_id))
+        .filter(Boolean)
+    )];
   } catch {
     // If this side-lookup fails, we still show the pick — just without badges.
   }
