@@ -26,10 +26,8 @@
       </div>
 
       <div class="field">
-        <label for="genre">Genre</label>
-        <select id="genre">
-          <option value="any">Any</option>
-        </select>
+        <label>Genre</label>
+        <button type="button" id="genreBtn" class="picker-btn">Any</button>
       </div>
 
       <div class="field">
@@ -63,6 +61,18 @@
     <section id="result" class="result hidden"></section>
     <p id="emptyMessage" class="empty hidden">Nothing matches those filters — try widening one of them.</p>
   </main>
+
+  <dialog id="genreDialog">
+    <div class="dialog-header">
+      <h3>Choose genres</h3>
+      <button type="button" id="genreClose" class="dialog-close" aria-label="Close">✕</button>
+    </div>
+    <div id="genreGrid" class="chip-grid"></div>
+    <div class="dialog-footer">
+      <button type="button" id="genreCancel" class="dialog-btn secondary">Cancel</button>
+      <button type="button" id="genreOk" class="dialog-btn primary">OK</button>
+    </div>
+  </dialog>
 
   <footer>
     <p>This product uses the TMDB API but is not endorsed or certified by

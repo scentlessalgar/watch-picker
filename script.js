@@ -51,7 +51,111 @@ async function tmdb(path, params = {}) {
 // ============================================================
 const movieGenres = {};
 const tvGenres = {};
-const genreSelect = document.getElementById("genre");
+
+// A small emoji per genre, purely decorative. TMDB's movie and TV genre
+// lists don't quite match (e.g. "Science Fiction" vs "Sci-Fi & Fantasy"),
+// so this covers both wordings. Anything not listed here just gets a
+// generic clapperboard rather than breaking.
+const GENRE_ICONS = {
+  "Action": "💥",
+  "Action & Adventure": "💥",
+  "Adventure": "🧭",
+  "Animation": "🎨",
+  "Comedy": "😂",
+  "Crime": "🕵️",
+  "Documentary": "🎥",
+  "Drama": "🎭",
+  "Family": "👨‍👩‍👧‍👦",
+  "Fantasy": "🧙",
+  "History": "🏛️",
+  "Horror": "😱",
+  "Kids": "🧸",
+  "Music": "🎵",
+  "Mystery": "🔍",
+  "News": "📰",
+  "Reality": "📺",
+  "Romance": "💕",
+  "Sci-Fi & Fantasy": "🚀",
+  "Science Fiction": "🚀",
+  "Soap": "🧼",
+  "Talk": "🎙️",
+  "Thriller": "🔪",
+  "TV Movie": "📺",
+  "War": "🪖",
+  "War & Politics": "🪖",
+  "Western": "🤠",
+};
+function genreIcon(name) {
+  return GENRE_ICONS[name] || "🎬";
+}
+
+// Genre picker: a button that opens a popup grid of pills, rather than a
+// long dropdown. Multi-select — selectedGenres is a set of genre names,
+// and an EMPTY set means "Any" (no restriction, i.e. every genre).
+const genreBtn = document.getElementById("genreBtn");
+const genreDialog = document.getElementById("genreDialog");
+const genreGrid = document.getElementById("genreGrid");
+const genreClose = document.getElementById("genreClose");
+const genreOk = document.getElementById("genreOk");
+const genreCancel = document.getElementById("genreCancel");
+const selectedGenres = new Set();
+let genreSnapshot = new Set(); // what selectedGenres looked like before this open, for Cancel to restore
+
+genreBtn.addEventListener("click", () => {
+  genreSnapshot = new Set(selectedGenres);
+  genreDialog.showModal();
+});
+
+// Any way of leaving the dialog other than clicking OK discards changes:
+// the X, Cancel, clicking the dimmed backdrop, or pressing Escape.
+genreOk.addEventListener("click", () => genreDialog.close("ok"));
+genreCancel.addEventListener("click", () => genreDialog.close("cancel"));
+genreClose.addEventListener("click", () => genreDialog.close("cancel"));
+genreDialog.addEventListener("click", e => {
+  if (e.target === genreDialog) genreDialog.close("cancel"); // click on the backdrop itself
+});
+genreDialog.addEventListener("close", () => {
+  if (genreDialog.returnValue !== "ok") {
+    selectedGenres.clear();
+    genreSnapshot.forEach(name => selectedGenres.add(name));
+    refreshChipStates();
+    updateGenreButtonLabel();
+  }
+  genreDialog.returnValue = "";
+});
+
+function updateGenreButtonLabel() {
+  if (selectedGenres.size === 0) {
+    genreBtn.textContent = "Any";
+    return;
+  }
+  const names = [...selectedGenres];
+  const first = `${genreIcon(names[0])} ${names[0]}`;
+  genreBtn.textContent = names.length === 1 ? first : `${first} +${names.length - 1} more`;
+}
+
+function refreshChipStates() {
+  genreGrid.querySelectorAll(".chip").forEach(chip => {
+    const isAnyChip = chip.dataset.genre === "any";
+    const isActive = isAnyChip ? selectedGenres.size === 0 : selectedGenres.has(chip.dataset.genre);
+    chip.classList.toggle("active", isActive);
+  });
+}
+
+// Picking "Any" clears everything (equivalent to selecting every genre).
+// Picking a specific genre toggles it on/off; the dialog stays open so
+// several can be picked in one go.
+function toggleGenre(name) {
+  if (name === "any") {
+    selectedGenres.clear();
+  } else if (selectedGenres.has(name)) {
+    selectedGenres.delete(name);
+  } else {
+    selectedGenres.add(name);
+  }
+  refreshChipStates();
+  updateGenreButtonLabel();
+}
 
 async function loadGenres() {
   const [movies, shows] = await Promise.all([
@@ -62,11 +166,24 @@ async function loadGenres() {
   shows.genres.forEach(g => (tvGenres[g.name] = g.id));
 
   const allNames = [...new Set([...Object.keys(movieGenres), ...Object.keys(tvGenres)])].sort();
+
+  genreGrid.innerHTML = "";
+  const anyChip = document.createElement("button");
+  anyChip.type = "button";
+  anyChip.className = "chip active";
+  anyChip.dataset.genre = "any";
+  anyChip.textContent = "Any";
+  anyChip.addEventListener("click", () => toggleGenre("any"));
+  genreGrid.appendChild(anyChip);
+
   allNames.forEach(name => {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    genreSelect.appendChild(opt);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip";
+    chip.dataset.genre = name;
+    chip.textContent = `${genreIcon(name)} ${name}`;
+    chip.addEventListener("click", () => toggleGenre(name));
+    genreGrid.appendChild(chip);
   });
 }
 
@@ -173,7 +290,7 @@ updateRatingLabel();
 // ============================================================
 // FETCHING CANDIDATES FROM TMDB
 // ============================================================
-async function fetchCandidates(mediaType, genreName, maxRuntime, minRating, providerIds) {
+async function fetchCandidates(mediaType, genreNames, maxRuntime, minRating, providerIds) {
   const genreMap = mediaType === "movie" ? movieGenres : tvGenres;
 
   const params = {
@@ -187,9 +304,13 @@ async function fetchCandidates(mediaType, genreName, maxRuntime, minRating, prov
     page: 1,
   };
 
-  if (genreName !== "any") {
-    if (!genreMap[genreName]) return []; // this genre doesn't exist for this media type
-    params.with_genres = genreMap[genreName];
+  // Empty genreNames means "Any" — no genre filter at all. Otherwise match
+  // ANY of the selected genres ("|" = OR), not all of them at once, since
+  // requiring every genre simultaneously would be far too restrictive.
+  if (genreNames.length > 0) {
+    const ids = genreNames.map(n => genreMap[n]).filter(Boolean);
+    if (ids.length === 0) return []; // none of the selected genres exist for this media type
+    params.with_genres = ids.join("|");
   }
 
   // TMDB only supports filtering movies by runtime, not TV shows
@@ -272,7 +393,7 @@ async function renderPick(pick, providerIds) {
 // ============================================================
 async function pickSomething() {
   const type = selectedType;
-  const genre = genreSelect.value;
+  const genreNames = [...selectedGenres]; // empty array = "Any"
   const maxRuntime = RUNTIME_STEPS[Number(maxRuntimeInput.value)].minutes; // null = no cap
   const minRating = Number(minRatingInput.value) / 10; // TMDB's vote_average is 0-10
   const providerIds = getCheckedProviderIds();
@@ -293,12 +414,12 @@ async function pickSomething() {
     let candidates = [];
     if (type === "any") {
       const [movies, shows] = await Promise.all([
-        fetchCandidates("movie", genre, maxRuntime, minRating, providerIds),
-        fetchCandidates("tv", genre, maxRuntime, minRating, providerIds),
+        fetchCandidates("movie", genreNames, maxRuntime, minRating, providerIds),
+        fetchCandidates("tv", genreNames, maxRuntime, minRating, providerIds),
       ]);
       candidates = [...movies, ...shows];
     } else {
-      candidates = await fetchCandidates(type, genre, maxRuntime, minRating, providerIds);
+      candidates = await fetchCandidates(type, genreNames, maxRuntime, minRating, providerIds);
     }
 
     if (candidates.length === 0) {
