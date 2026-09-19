@@ -27,6 +27,78 @@ header {
 h1 { margin: 0 0 6px; font-size: 1.8rem; }
 .subtitle { color: var(--muted); margin: 0; }
 
+.auth-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.auth-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.hidden { display: none; }
+
+dialog#authDialog {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  background: var(--card);
+  color: var(--text);
+  width: min(340px, 90vw);
+}
+dialog#authDialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+dialog#authDialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px 20px;
+}
+.google-btn {
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #33384a;
+  font-weight: 600;
+}
+.auth-divider {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.text-input {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #33384a;
+  background: #22263a;
+  color: var(--text);
+  font-size: 0.9rem;
+  width: 100%;
+}
+.auth-error {
+  color: #ff6b6b;
+  font-size: 0.8rem;
+  margin: 0;
+}
+.auth-form-buttons {
+  display: flex;
+  gap: 10px;
+}
+.auth-form-buttons .dialog-btn { flex: 1; }
+
 main {
   width: 100%;
   max-width: 480px;

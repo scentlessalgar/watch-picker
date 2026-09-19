@@ -11,6 +11,11 @@
   <header>
     <h1>🍿 What2Watch</h1>
     <p class="subtitle">Tell it what you're in the mood for, it picks something.</p>
+    <div class="auth-bar">
+      <span id="authStatus">Checking sign-in status…</span>
+      <button type="button" id="signInBtn" class="auth-link hidden">Sign in</button>
+      <button type="button" id="signOutBtn" class="auth-link hidden">Sign out</button>
+    </div>
   </header>
 
   <main>
@@ -74,10 +79,33 @@
     </div>
   </dialog>
 
+  <dialog id="authDialog">
+    <div class="dialog-header">
+      <h3>Sign in</h3>
+      <button type="button" id="authClose" class="dialog-close" aria-label="Close">✕</button>
+    </div>
+    <div class="auth-form">
+      <button type="button" id="googleSignInBtn" class="dialog-btn google-btn">Continue with Google</button>
+      <div class="auth-divider">or</div>
+      <input type="email" id="authEmail" class="text-input" placeholder="Email" autocomplete="email">
+      <input type="password" id="authPassword" class="text-input" placeholder="Password" autocomplete="current-password">
+      <p id="authError" class="auth-error hidden"></p>
+      <div class="auth-form-buttons">
+        <button type="button" id="authSignInBtn" class="dialog-btn secondary">Sign in</button>
+        <button type="button" id="authCreateBtn" class="dialog-btn primary">Create account</button>
+      </div>
+    </div>
+  </dialog>
+
   <footer>
     <p>This product uses the TMDB API but is not endorsed or certified by
       <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>.</p>
   </footer>
+
+  <!-- Firebase (plain <script> version — no build step, matches the rest of this app) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <script src="script.js"></script>
 </body>

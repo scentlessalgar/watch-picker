@@ -1,4 +1,101 @@
 // ============================================================
+// FIREBASE SETUP
+// ============================================================
+// These values identify which Firebase project this app talks to — public
+// by design (same idea as the TMDB token above), the actual security comes
+// from the sign-in requirement and the database rules we set up later.
+const firebaseConfig = {
+  apiKey: "AIzaSyCziyI7v2VdwEnAglCqC3Ui6Z12YLIh9fE",
+  authDomain: "what2watch-32da6.firebaseapp.com",
+  projectId: "what2watch-32da6",
+  storageBucket: "what2watch-32da6.firebasestorage.app",
+  messagingSenderId: "857317886561",
+  appId: "1:857317886561:web:deb8ecce131785a9f9f820",
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ============================================================
+// SIGN-IN UI
+// ============================================================
+const authStatus = document.getElementById("authStatus");
+const signInBtn = document.getElementById("signInBtn");
+const signOutBtn = document.getElementById("signOutBtn");
+const authDialog = document.getElementById("authDialog");
+const authClose = document.getElementById("authClose");
+const googleSignInBtn = document.getElementById("googleSignInBtn");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authError = document.getElementById("authError");
+const authSignInBtn = document.getElementById("authSignInBtn");
+const authCreateBtn = document.getElementById("authCreateBtn");
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+function showAuthError(message) {
+  authError.textContent = message;
+  authError.classList.remove("hidden");
+}
+
+signInBtn.addEventListener("click", () => {
+  authError.classList.add("hidden");
+  authEmail.value = "";
+  authPassword.value = "";
+  authDialog.showModal();
+});
+authClose.addEventListener("click", () => authDialog.close());
+authDialog.addEventListener("click", e => {
+  if (e.target === authDialog) authDialog.close(); // backdrop click
+});
+
+googleSignInBtn.addEventListener("click", () => {
+  auth.signInWithPopup(googleProvider)
+    .then(() => authDialog.close())
+    .catch(err => showAuthError(err.message));
+});
+
+authSignInBtn.addEventListener("click", () => {
+  auth.signInWithEmailAndPassword(authEmail.value, authPassword.value)
+    .then(() => authDialog.close())
+    .catch(err => showAuthError(err.message));
+});
+
+// Deliberately simple: "Create account" just calls Firebase's sign-up
+// function directly from the same form, rather than a separate page.
+authCreateBtn.addEventListener("click", () => {
+  auth.createUserWithEmailAndPassword(authEmail.value, authPassword.value)
+    .then(() => authDialog.close())
+    .catch(err => showAuthError(err.message));
+});
+
+signOutBtn.addEventListener("click", () => auth.signOut());
+
+// The single source of truth for what the header shows — fires immediately
+// on page load (telling us if someone's already signed in) and again
+// every time sign-in/out happens.
+auth.onAuthStateChanged(user => {
+  if (user) {
+    authStatus.textContent = `Signed in as ${user.email || user.displayName}`;
+    signInBtn.classList.add("hidden");
+    signOutBtn.classList.remove("hidden");
+
+    // Load this account's saved streaming services, if they've saved any before.
+    db.collection("users").doc(user.uid).get().then(docSnap => {
+      const services = docSnap.exists ? docSnap.data().services : null;
+      if (Array.isArray(services)) {
+        savedServiceNames = new Set(services);
+        applySavedServicesToButtons();
+      }
+    }).catch(err => console.error("Couldn't load saved services:", err));
+  } else {
+    authStatus.textContent = "Not signed in";
+    signInBtn.classList.remove("hidden");
+    signOutBtn.classList.add("hidden");
+    savedServiceNames = null; // don't carry a signed-out user's preferences forward
+  }
+});
+
+// ============================================================
 // CONFIG
 // ============================================================
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2MmE2NDQ4NGZkZTVjZTE2YjU3MDFhNmUyNzA5ZmEwNyIsIm5iZiI6MTc4OTMxNDU0Ni44OCwic3ViIjoiNmFhNmM1ZjJhNWUyMjBhOTM5YTk4MWM3Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9._8bREwsUIY-yzu8RYJ7WEK6FJFqIImvpc7yhB0OUIWw";
@@ -205,6 +302,18 @@ typeToggle.querySelectorAll(".toggle-btn").forEach(btn => {
 // ============================================================
 const serviceList = document.getElementById("serviceList");
 
+// A signed-in user's saved selection, once loaded from Firestore — null
+// means "not signed in, or nothing saved yet", i.e. leave the all-on default
+// alone. Kept separate from the buttons themselves because the buttons get
+// rebuilt (e.g. once logos arrive), and each rebuild needs to reapply this.
+let savedServiceNames = null;
+function applySavedServicesToButtons() {
+  if (!savedServiceNames) return;
+  serviceList.querySelectorAll(".service-btn").forEach(btn => {
+    btn.classList.toggle("active", savedServiceNames.has(btn.dataset.name));
+  });
+}
+
 // Builds the toggle buttons. logoById is optional — if we don't have
 // logos yet (or the lookup fails), the buttons still work, just as
 // text-only pills. All start "on", matching the old checked-by-default checkboxes.
@@ -219,11 +328,25 @@ function buildServiceButtons(logoById = {}) {
     btn.innerHTML = logoPath
       ? `<img src="${LOGO_BASE}${logoPath}" alt="">${service.name}`
       : service.name;
-    btn.addEventListener("click", () => btn.classList.toggle("active"));
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("active");
+      saveServicesIfSignedIn();
+    });
     serviceList.appendChild(btn);
   });
+  applySavedServicesToButtons(); // reapply whatever we already know, if anything
 }
 buildServiceButtons(); // show text-only buttons immediately, no waiting on a network call
+
+// While signed in, every tap of a service button saves the full current
+// selection straight to that user's Firestore document.
+function saveServicesIfSignedIn() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const activeNames = [...serviceList.querySelectorAll(".service-btn.active")].map(b => b.dataset.name);
+  db.collection("users").doc(user.uid).set({ services: activeNames }, { merge: true })
+    .catch(err => console.error("Couldn't save streaming services:", err));
+}
 
 // Once we know each service's logo (from TMDB's own provider list — the
 // same source the poster images come from), rebuild the buttons with them.
