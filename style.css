@@ -396,18 +396,70 @@ input[type="range"]::-moz-range-track {
 
 .result {
   margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
 }
 
 .result.hidden, .empty.hidden { display: none; }
 
+/* Carousel: one result card per view, swipe or use the arrows to move
+   between them. scroll-snap does the "settle on a card" behaviour natively. */
+.carousel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.carousel-track {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  flex: 1 1 auto;
+  min-width: 0;
+
+  /* The dots + arrows are the visible scroll UI, so hide the native bar. */
+  scrollbar-width: none;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+
 .pick-card {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
   background: var(--card);
   border-radius: 12px;
   padding: 20px;
 }
+
+.carousel-nav {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 1.3rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.carousel-nav:disabled { opacity: 0.3; cursor: default; }
+
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.dot.active { background: var(--accent); }
 
 .result-inner { display: flex; gap: 16px; }
 .result .poster { width: 110px; border-radius: 8px; flex-shrink: 0; }

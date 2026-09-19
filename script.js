@@ -591,13 +591,53 @@ async function buildPickCardHtml(pick, providerIds) {
   `;
 }
 
-// Renders several picks at once (each does its own provider lookup, in parallel).
+// Renders several picks at once (each does its own provider lookup, in
+// parallel) as a swipeable carousel — one card per view, arrows/dots to move.
 async function renderPicks(picks, providerIds) {
   const cardsHtml = await Promise.all(picks.map(pick => buildPickCardHtml(pick, providerIds)));
 
   emptyMessage.classList.add("hidden");
   resultBox.classList.remove("hidden");
-  resultBox.innerHTML = cardsHtml.join("");
+  resultBox.innerHTML = `
+    <div class="carousel">
+      <button type="button" class="carousel-nav prev" aria-label="Previous option">‹</button>
+      <div class="carousel-track" id="resultTrack">${cardsHtml.join("")}</div>
+      <button type="button" class="carousel-nav next" aria-label="Next option">›</button>
+    </div>
+    <div class="carousel-dots" id="resultDots">
+      ${picks.map((_, i) => `<span class="dot${i === 0 ? " active" : ""}"></span>`).join("")}
+    </div>
+  `;
+  setUpCarousel();
+}
+
+// Wires the arrows and dots up to the actual scrolling — the browser's
+// native scroll-snap does the "settle on a card" part on its own, this
+// just needs to keep the arrows/dots in sync and give the arrows something to do.
+function setUpCarousel() {
+  const track = document.getElementById("resultTrack");
+  if (!track) return;
+  const dots = [...document.querySelectorAll("#resultDots .dot")];
+  const prevBtn = resultBox.querySelector(".carousel-nav.prev");
+  const nextBtn = resultBox.querySelector(".carousel-nav.next");
+  const TRACK_GAP = 14; // must match the CSS gap on .carousel-track
+
+  function stepWidth() {
+    const card = track.querySelector(".pick-card");
+    return card ? card.getBoundingClientRect().width + TRACK_GAP : track.clientWidth;
+  }
+
+  function syncControls() {
+    prevBtn.disabled = track.scrollLeft <= 4;
+    nextBtn.disabled = track.scrollLeft >= track.scrollWidth - track.clientWidth - 4;
+    const index = Math.round(track.scrollLeft / stepWidth());
+    dots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+  }
+
+  prevBtn.addEventListener("click", () => track.scrollBy({ left: -stepWidth(), behavior: "smooth" }));
+  nextBtn.addEventListener("click", () => track.scrollBy({ left: stepWidth(), behavior: "smooth" }));
+  track.addEventListener("scroll", () => requestAnimationFrame(syncControls));
+  syncControls();
 }
 
 // ============================================================
