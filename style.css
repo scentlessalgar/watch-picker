@@ -1,9 +1,19 @@
 :root {
-  --bg: #12141c;
-  --card: #1c1f2b;
-  --accent: #f5c542;
-  --text: #eceef2;
-  --muted: #9aa0ad;
+  /* Theme: Violet Pulse, with amber reserved for the one main call-to-action
+     button. Everything below is a variable so a future theme change is a
+     matter of editing this block only — nothing else in the file should
+     ever hold a color literal. */
+  --bg: #14101f;
+  --card: #201a30;
+  --border: #3a2f52;
+  --input-bg: #241c38;
+  --accent: #a78bfa;      /* selection / control state: toggles, chips, slider, service pills, dialog primary buttons */
+  --on-accent: #1c1330;   /* text/icon color on top of --accent */
+  --cta: #f5c542;         /* the one main "do the thing" button */
+  --cta-text: #1a1a1a;    /* text color on top of --cta */
+  --text: #ece8f5;
+  --muted: #a291b8;
+  --error: #ff6b6b;
   font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -71,7 +81,7 @@ dialog#authDialog::backdrop {
 .google-btn {
   background: #fff;
   color: #1a1a1a;
-  border: 1px solid #33384a;
+  border: 1px solid var(--border);
   font-weight: 600;
 }
 .auth-divider {
@@ -82,14 +92,14 @@ dialog#authDialog::backdrop {
 .text-input {
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #33384a;
-  background: #22263a;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
   color: var(--text);
   font-size: 0.9rem;
   width: 100%;
 }
 .auth-error {
-  color: #ff6b6b;
+  color: var(--error);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -122,14 +132,10 @@ main {
 
 select {
   width: 100%;
-}
-
-select {
   padding: 8px;
   border-radius: 8px;
-  border: 1px solid #33384a;
-  background: #22263300;
-  background: #22263a;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
   color: var(--text);
 }
 
@@ -138,8 +144,8 @@ select {
   text-align: left;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #33384a;
-  background: #22263a;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
   color: var(--text);
   font-size: 0.95rem;
   cursor: pointer;
@@ -194,12 +200,12 @@ dialog#genreDialog::backdrop {
   /* Dark, rounded scrollbar to match the rest of the app instead of the
      browser's default (Firefox + Chrome/Edge/Safari need separate rules). */
   scrollbar-width: thin;
-  scrollbar-color: #33384a var(--card);
+  scrollbar-color: var(--border) var(--card);
 }
 .chip-grid::-webkit-scrollbar { width: 8px; }
 .chip-grid::-webkit-scrollbar-track { background: var(--card); }
 .chip-grid::-webkit-scrollbar-thumb {
-  background: #33384a;
+  background: var(--border);
   border-radius: 999px;
 }
 .chip-grid::-webkit-scrollbar-thumb:hover { background: var(--accent); }
@@ -210,28 +216,28 @@ dialog#genreDialog::backdrop {
   gap: 10px;
   justify-content: flex-end;
   padding: 14px 20px;
-  border-top: 1px solid #2a2f42;
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 .dialog-btn {
   padding: 8px 18px;
   border-radius: 8px;
-  border: 1px solid #33384a;
+  border: 1px solid var(--border);
   font-size: 0.9rem;
   cursor: pointer;
 }
-.dialog-btn.secondary { background: #22263a; color: var(--text); }
+.dialog-btn.secondary { background: var(--input-bg); color: var(--text); }
 .dialog-btn.primary {
   background: var(--accent);
-  color: #1a1a1a;
+  color: var(--on-accent);
   font-weight: 600;
   border-color: var(--accent);
 }
 .chip {
   padding: 8px 14px;
   border-radius: 999px;
-  border: 1px solid #33384a;
-  background: #22263a;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
   color: var(--muted);
   font-size: 0.85rem;
   cursor: pointer;
@@ -239,8 +245,45 @@ dialog#genreDialog::backdrop {
 .chip.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1a1a1a;
+  color: var(--on-accent);
   font-weight: 600;
+}
+
+/* Age rating picker — a row of badges styled like the familiar BBFC
+   certificates (black rounded square, bold white text). Clicking one
+   selects it and everything less restrictive to its left. */
+.rating-group {
+  display: flex;
+  gap: 8px;
+}
+.rating-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 8px;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+.rating-btn.active { opacity: 1; }
+.rating-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.rating-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 2px solid #fff;
+  background: #000;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+.rating-btn.active .rating-badge {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* Toggle button group (used for Movie/TV show) */
@@ -252,8 +295,8 @@ dialog#genreDialog::backdrop {
   flex: 1;
   padding: 10px 8px;
   border-radius: 8px;
-  border: 1px solid #33384a;
-  background: #22263a;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
   color: var(--muted);
   font-size: 0.9rem;
   cursor: pointer;
@@ -261,7 +304,7 @@ dialog#genreDialog::backdrop {
 .toggle-btn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1a1a1a;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -272,7 +315,7 @@ input[type="range"] {
   appearance: none;
   height: 6px;
   border-radius: 999px;
-  background: linear-gradient(to right, var(--accent) var(--fill, 0%), #2a2f42 var(--fill, 0%));
+  background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--border) var(--fill, 0%));
   outline: none;
 }
 input[type="range"]::-webkit-slider-thumb {
@@ -282,7 +325,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 20px;
   border-radius: 50%;
   background: var(--accent);
-  border: 3px solid #1a1a1a;
+  border: 3px solid var(--card);
   box-shadow: 0 0 0 2px var(--accent);
   cursor: pointer;
 }
@@ -291,7 +334,7 @@ input[type="range"]::-moz-range-thumb {
   height: 20px;
   border-radius: 50%;
   background: var(--accent);
-  border: 3px solid #1a1a1a;
+  border: 3px solid var(--card);
   box-shadow: 0 0 0 2px var(--accent);
   cursor: pointer;
 }
@@ -313,8 +356,8 @@ input[type="range"]::-moz-range-track {
   gap: 8px;
   padding: 6px 12px 6px 6px;
   border-radius: 999px;
-  border: 1px solid #33384a;
-  background: #22263a;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
   color: var(--muted);
   font-size: 0.85rem;
   cursor: pointer;
@@ -330,7 +373,7 @@ input[type="range"]::-moz-range-track {
 .service-btn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1a1a1a;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -344,8 +387,8 @@ input[type="range"]::-moz-range-track {
   font-weight: 600;
   border: none;
   border-radius: 12px;
-  background: var(--accent);
-  color: #1a1a1a;
+  background: var(--cta);
+  color: var(--cta-text);
   cursor: pointer;
 }
 
@@ -353,12 +396,18 @@ input[type="range"]::-moz-range-track {
 
 .result {
   margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.result.hidden, .empty.hidden { display: none; }
+
+.pick-card {
   background: var(--card);
   border-radius: 12px;
   padding: 20px;
 }
-
-.result.hidden, .empty.hidden { display: none; }
 
 .result-inner { display: flex; gap: 16px; }
 .result .poster { width: 110px; border-radius: 8px; flex-shrink: 0; }
@@ -368,7 +417,7 @@ input[type="range"]::-moz-range-track {
 .result .overview { font-size: 0.85rem; color: var(--text); margin: 0 0 10px; }
 .result .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .result .badge {
-  background: #22263a;
+  background: var(--input-bg);
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 0.8rem;

@@ -54,6 +54,27 @@
         </datalist>
       </div>
 
+      <div class="field">
+        <label>Max age rating</label>
+        <div class="rating-group" id="ageRatingGroup">
+          <button type="button" class="rating-btn" data-value="U" aria-pressed="true">
+            <span class="rating-badge">U</span>
+          </button>
+          <button type="button" class="rating-btn" data-value="PG" aria-pressed="true">
+            <span class="rating-badge">PG</span>
+          </button>
+          <button type="button" class="rating-btn" data-value="12" aria-pressed="true">
+            <span class="rating-badge">12</span>
+          </button>
+          <button type="button" class="rating-btn" data-value="15" aria-pressed="true">
+            <span class="rating-badge">15</span>
+          </button>
+          <button type="button" class="rating-btn" data-value="18" aria-pressed="true">
+            <span class="rating-badge">18</span>
+          </button>
+        </div>
+      </div>
+
       <div class="field services">
         <label>Which services do you have?</label>
         <div id="serviceList" class="service-grid"></div>
@@ -61,7 +82,7 @@
 
     </section>
 
-    <button id="pickBtn">Suggest some options 🎲</button>
+    <button type="button" id="pickBtn">Show me What2Watch</button>
 
     <section id="result" class="result hidden"></section>
     <p id="emptyMessage" class="empty hidden">Nothing matches those filters — try widening one of them.</p>

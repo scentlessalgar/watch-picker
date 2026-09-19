@@ -103,6 +103,22 @@ const API_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p/w342"; // posters
 const LOGO_BASE = "https://image.tmdb.org/t/p/w92"; // service logos — smaller, no need for poster-size
 const REGION = "GB";
+const OPTIONS_COUNT = 4; // how many suggestions to show per click
+
+// UK age ratings, in increasing order of restrictiveness. Picking one in the
+// filter allows it and everything below it (e.g. "12" allows U, PG and 12).
+// TMDB records a slightly different certification string for a movie's
+// cinema release ("12A") than for a TV show ("12") — same tier, different label.
+const RATINGS = [
+  { code: "U", movieCert: "U", tvCert: "U" },
+  { code: "PG", movieCert: "PG", tvCert: "PG" },
+  { code: "12", movieCert: "12A", tvCert: "12" },
+  { code: "15", movieCert: "15", tvCert: "15" },
+  { code: "18", movieCert: "18", tvCert: "18" },
+];
+function ratingOrder(code) {
+  return RATINGS.findIndex(r => r.code === code);
+}
 
 // Streaming services offered as checkboxes. Each maps to one or more TMDB
 // provider IDs, because TMDB treats every pricing tier of a service (e.g.
@@ -410,10 +426,32 @@ function updateRatingLabel() {
 minRatingInput.addEventListener("input", updateRatingLabel);
 updateRatingLabel();
 
+// Max age rating — a row of badges, left to right from least to most
+// restrictive. Clicking one selects it and everything to its left; defaults
+// to "18", i.e. everything included.
+const ageRatingGroup = document.getElementById("ageRatingGroup");
+let selectedAgeRating = "18";
+
+function applyAgeRatingSelection(code) {
+  selectedAgeRating = code;
+  const maxOrder = ratingOrder(code);
+  ageRatingGroup.querySelectorAll(".rating-btn").forEach(btn => {
+    const included = ratingOrder(btn.dataset.value) <= maxOrder;
+    btn.classList.toggle("active", included);
+    btn.setAttribute("aria-pressed", included ? "true" : "false");
+  });
+}
+
+ageRatingGroup.querySelectorAll(".rating-btn").forEach(btn => {
+  btn.addEventListener("click", () => applyAgeRatingSelection(btn.dataset.value));
+});
+
+applyAgeRatingSelection(selectedAgeRating);
+
 // ============================================================
 // FETCHING CANDIDATES FROM TMDB
 // ============================================================
-async function fetchCandidates(mediaType, genreNames, maxRuntime, minRating, providerIds) {
+async function fetchCandidates(mediaType, genreNames, maxRuntime, minRating, providerIds, maxAgeRating) {
   const genreMap = mediaType === "movie" ? movieGenres : tvGenres;
 
   const params = {
@@ -426,6 +464,15 @@ async function fetchCandidates(mediaType, genreNames, maxRuntime, minRating, pro
     "vote_count.gte": 50, // ignore obscure titles with barely any votes
     page: 1,
   };
+
+  // TMDB can filter movies by UK certification directly. "18" means no
+  // restriction (every rating is 18 or below), so skip the filter entirely
+  // rather than ask TMDB to filter down to something that means "everything".
+  if (mediaType === "movie" && maxAgeRating !== "18") {
+    const tier = RATINGS.find(r => r.code === maxAgeRating);
+    params.certification_country = "GB";
+    params["certification.lte"] = tier.movieCert;
+  }
 
   // Empty genreNames means "Any" — no genre filter at all. Otherwise match
   // ANY of the selected genres ("|" = OR), not all of them at once, since
@@ -458,7 +505,31 @@ async function fetchCandidates(mediaType, genreNames, maxRuntime, minRating, pro
     }
   }
 
+  // TV shows have no equivalent server-side certification filter, so this
+  // checks each candidate's actual UK content rating and drops anything
+  // too old for the selected tier. Skipped entirely for "18" (no restriction).
+  if (mediaType === "tv" && maxAgeRating !== "18") {
+    results = await filterTvByAgeRating(results, maxAgeRating);
+  }
+
   return results.map(r => ({ ...r, media_type: mediaType }));
+}
+
+async function filterTvByAgeRating(shows, maxAgeRating) {
+  const maxOrder = ratingOrder(maxAgeRating);
+  const checked = await Promise.all(shows.map(async show => {
+    try {
+      const data = await tmdb(`/tv/${show.id}/content_ratings`);
+      const gb = (data.results || []).find(r => r.iso_3166_1 === "GB");
+      // No UK rating on file for this show — we can't tell, so don't hide it.
+      if (!gb || !gb.rating) return show;
+      const order = RATINGS.findIndex(r => r.tvCert === gb.rating);
+      return order === -1 || order <= maxOrder ? show : null;
+    } catch {
+      return show; // a failed lookup shouldn't hide an otherwise-good match
+    }
+  }));
+  return checked.filter(Boolean);
 }
 
 // ============================================================
@@ -468,7 +539,16 @@ const resultBox = document.getElementById("result");
 const emptyMessage = document.getElementById("emptyMessage");
 const pickBtn = document.getElementById("pickBtn");
 
-async function renderPick(pick, providerIds) {
+// After a pick (or an empty/error message) appears, bring it into view
+// instead of leaving the person to scroll down and find it themselves.
+function scrollResultIntoView() {
+  const target = resultBox.classList.contains("hidden") ? emptyMessage : resultBox;
+  if (target.classList.contains("hidden")) return;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Builds the markup for one pick — used to render several at once.
+async function buildPickCardHtml(pick, providerIds) {
   const title = pick.title || pick.name;
   const dateStr = pick.release_date || pick.first_air_date;
   const year = dateStr ? dateStr.slice(0, 4) : "";
@@ -494,21 +574,30 @@ async function renderPick(pick, providerIds) {
     // If this side-lookup fails, we still show the pick — just without badges.
   }
 
-  emptyMessage.classList.add("hidden");
-  resultBox.classList.remove("hidden");
-  resultBox.innerHTML = `
-    <div class="result-inner">
-      ${poster ? `<img class="poster" src="${poster}" alt="${title} poster">` : ""}
-      <div class="result-text">
-        <h2>${title}${year ? ` (${year})` : ""}</h2>
-        <p class="meta">${pick.media_type === "movie" ? "Movie" : "TV show"} · ${rating}%</p>
-        <p class="overview">${pick.overview || "No description available."}</p>
-        <div class="badges">
-          ${(matchedNames.length ? matchedNames : ["Check availability"]).map(n => `<span class="badge">${n}</span>`).join("")}
+  return `
+    <div class="pick-card">
+      <div class="result-inner">
+        ${poster ? `<img class="poster" src="${poster}" alt="${title} poster">` : ""}
+        <div class="result-text">
+          <h2>${title}${year ? ` (${year})` : ""}</h2>
+          <p class="meta">${pick.media_type === "movie" ? "Movie" : "TV show"} · ${rating}%</p>
+          <p class="overview">${pick.overview || "No description available."}</p>
+          <div class="badges">
+            ${(matchedNames.length ? matchedNames : ["Check availability"]).map(n => `<span class="badge">${n}</span>`).join("")}
+          </div>
         </div>
       </div>
     </div>
   `;
+}
+
+// Renders several picks at once (each does its own provider lookup, in parallel).
+async function renderPicks(picks, providerIds) {
+  const cardsHtml = await Promise.all(picks.map(pick => buildPickCardHtml(pick, providerIds)));
+
+  emptyMessage.classList.add("hidden");
+  resultBox.classList.remove("hidden");
+  resultBox.innerHTML = cardsHtml.join("");
 }
 
 // ============================================================
@@ -519,12 +608,14 @@ async function pickSomething() {
   const genreNames = [...selectedGenres]; // empty array = "Any"
   const maxRuntime = RUNTIME_STEPS[Number(maxRuntimeInput.value)].minutes; // null = no cap
   const minRating = Number(minRatingInput.value) / 10; // TMDB's vote_average is 0-10
+  const maxAgeRating = selectedAgeRating; // "U" | "PG" | "12" | "15" | "18"
   const providerIds = getCheckedProviderIds();
 
   if (providerIds.length === 0) {
     resultBox.classList.add("hidden");
     emptyMessage.textContent = "Tick at least one streaming service.";
     emptyMessage.classList.remove("hidden");
+    scrollResultIntoView();
     return;
   }
 
@@ -537,12 +628,12 @@ async function pickSomething() {
     let candidates = [];
     if (type === "any") {
       const [movies, shows] = await Promise.all([
-        fetchCandidates("movie", genreNames, maxRuntime, minRating, providerIds),
-        fetchCandidates("tv", genreNames, maxRuntime, minRating, providerIds),
+        fetchCandidates("movie", genreNames, maxRuntime, minRating, providerIds, maxAgeRating),
+        fetchCandidates("tv", genreNames, maxRuntime, minRating, providerIds, maxAgeRating),
       ]);
       candidates = [...movies, ...shows];
     } else {
-      candidates = await fetchCandidates(type, genreNames, maxRuntime, minRating, providerIds);
+      candidates = await fetchCandidates(type, genreNames, maxRuntime, minRating, providerIds, maxAgeRating);
     }
 
     if (candidates.length === 0) {
@@ -551,14 +642,17 @@ async function pickSomething() {
       return;
     }
 
-    const pick = candidates[Math.floor(Math.random() * candidates.length)];
-    await renderPick(pick, providerIds);
+    // Show up to 4 different options, not just one, so there's a real choice.
+    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    const picks = shuffled.slice(0, OPTIONS_COUNT);
+    await renderPicks(picks, providerIds);
   } catch (err) {
     emptyMessage.textContent = `Something went wrong talking to TMDB (${err.message}).`;
     emptyMessage.classList.remove("hidden");
   } finally {
     pickBtn.disabled = false;
-    pickBtn.textContent = "Suggest some options 🎲";
+    pickBtn.textContent = "Show me What2Watch";
+    scrollResultIntoView();
   }
 }
 
