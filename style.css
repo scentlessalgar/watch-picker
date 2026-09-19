@@ -249,9 +249,10 @@ dialog#genreDialog::backdrop {
   font-weight: 600;
 }
 
-/* Age rating picker — a row of badges styled like the familiar BBFC
-   certificates (black rounded square, bold white text). Clicking one
-   selects it and everything less restrictive to its left. */
+/* Age rating picker — a row of badges matching the real BBFC symbols
+   (green U / amber PG triangles, orange 12, pink 15, red 18 circles, all
+   with a black outline). Clicking one selects it and everything to its
+   left, i.e. everything less restrictive. */
 .rating-group {
   display: flex;
   gap: 8px;
@@ -263,27 +264,20 @@ dialog#genreDialog::backdrop {
   cursor: pointer;
   border-radius: 8px;
   opacity: 0.4;
-  transition: opacity 0.15s ease;
+  transform: scale(1);
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
-.rating-btn.active { opacity: 1; }
+.rating-btn.active { opacity: 1; transform: scale(1.08); }
 .rating-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.rating-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.rating-icon {
+  display: block;
   width: 42px;
   height: 42px;
-  box-sizing: border-box;
-  border-radius: 8px;
-  border: 2px solid #fff;
-  background: #000;
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.85rem;
 }
-.rating-btn.active .rating-badge {
-  box-shadow: 0 0 0 2px var(--accent);
+.rating-icon text {
+  fill: #fff;
+  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* Toggle button group (used for Movie/TV show) */
